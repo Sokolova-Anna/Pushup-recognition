@@ -1,6 +1,7 @@
 import argparse
 import cv2
 import mediapipe as mp
+import time
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -18,11 +19,18 @@ def main():
   if (vid_capture.isOpened() == False):
     print("Error opening video file")
   else:
+    prev_frame_time = 0
+    # used to record the time at which we processed current frame
+    new_frame_time = 0
+    # ширина видео
+    frame_width = int(vid_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+     #высоты видео
+    frame_height = int(vid_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     video_fps = vid_capture.get(cv2.CAP_PROP_FPS)
     print('FPS: ', video_fps)
 
   print('\nPress ESC to quit\n')
-    
+
   file_count = 0
   while (vid_capture.isOpened()):
     ret, input_frame = vid_capture.read()
@@ -40,7 +48,15 @@ def main():
           image=output_frame,
           landmark_list=pose_landmarks,
           connections=mp_pose.POSE_CONNECTIONS)
-
+        
+      output_frame = cv2.resize(output_frame, (500, 300))
+      font = cv2.FONT_HERSHEY_SIMPLEX #шрифт
+      new_frame_time = time.time()
+      fps = 1/(new_frame_time-prev_frame_time)
+      prev_frame_time = new_frame_time
+      fps = int(fps)
+      fps = str(fps)
+      cv2.putText(output_frame, fps, (7, 70), font, 3, (100, 255, 0), 3, cv2.LINE_AA) 
       output_frame = cv2.cvtColor(output_frame, cv2.COLOR_RGB2BGR)
       cv2.imshow('Frames', output_frame)
       file_count += 1
