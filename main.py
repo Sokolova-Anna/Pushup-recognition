@@ -2,6 +2,13 @@ import argparse
 import cv2
 import mediapipe as mp
 import time
+import numpy as np
+import io
+import csv
+import os
+from pose_classifier import PoseClassifier
+from EMA_smoothing import EMADictSmoothing
+from embedder import FullBodyPoseEmbedder
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -11,6 +18,21 @@ pose_tracker = mp_pose.Pose()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('video', type=str, help='Input dir for videos')
+
+pose_samples_folder = 'fitness_poses_csvs_out'
+
+pose_embedder = FullBodyPoseEmbedder()
+
+pose_classifier = PoseClassifier(
+    pose_samples_folder=pose_samples_folder,
+    pose_embedder=pose_embedder,
+    top_n_by_max_distance=30,
+    top_n_by_mean_distance=10)
+
+pose_classification_filter = EMADictSmoothing(
+    window_size=10,
+    alpha=0.2)
+
 
 def main():
   args = parser.parse_args()
@@ -48,7 +70,21 @@ def main():
           image=output_frame,
           landmark_list=pose_landmarks,
           connections=mp_pose.POSE_CONNECTIONS)
-        
+
+      if pose_landmarks is not None:
+        # Get landmarks.
+        frame_height, frame_width = output_frame.shape[0], output_frame.shape[1]
+        pose_landmarks = np.array([[lmk.x * frame_width, lmk.y * frame_height, lmk.z * frame_width]
+                                  for lmk in pose_landmarks.landmark], dtype=np.float32)
+        assert pose_landmarks.shape == (33, 3), 'Unexpected landmarks shape: {}'.format(pose_landmarks.shape)
+
+        # Classify the pose on the current frame.
+        pose_classification = pose_classifier(pose_landmarks)
+        print(pose_classification)
+
+        # Smooth classification using EMA.
+        pose_classification_filtered = pose_classification_filter(pose_classification)
+
       output_frame = cv2.resize(output_frame, (500, 300))
       font = cv2.FONT_HERSHEY_SIMPLEX #шрифт
       new_frame_time = time.time()
@@ -56,7 +92,7 @@ def main():
       prev_frame_time = new_frame_time
       fps = int(fps)
       fps = str(fps)
-      cv2.putText(output_frame, fps, (7, 70), font, 3, (100, 255, 0), 3, cv2.LINE_AA) 
+      cv2.putText(output_frame, fps, (7, 70), font, 3, (100, 255, 0), 3, cv2.LINE_AA)
       output_frame = cv2.cvtColor(output_frame, cv2.COLOR_RGB2BGR)
       cv2.imshow('Frames', output_frame)
       file_count += 1
