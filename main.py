@@ -9,6 +9,7 @@ import os
 from pose_classifier import PoseClassifier
 from EMA_smoothing import EMADictSmoothing
 from embedder import FullBodyPoseEmbedder
+from rep_count import RepetitionCounter
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -33,6 +34,11 @@ pose_classification_filter = EMADictSmoothing(
     window_size=10,
     alpha=0.2)
 
+class_name='pushups_down'
+repetition_counter = RepetitionCounter(
+    class_name=class_name,
+    enter_threshold=6,
+    exit_threshold=4)
 
 def main():
   args = parser.parse_args()
@@ -80,10 +86,12 @@ def main():
 
         # Classify the pose on the current frame.
         pose_classification = pose_classifier(pose_landmarks)
-        print(pose_classification)
+        #print(pose_classification)
 
         # Smooth classification using EMA.
         pose_classification_filtered = pose_classification_filter(pose_classification)
+
+        repetitions_count = repetition_counter(pose_classification_filtered)
 
       output_frame = cv2.resize(output_frame, (500, 300))
       font = cv2.FONT_HERSHEY_SIMPLEX #шрифт
@@ -102,6 +110,7 @@ def main():
     else:
       break
 
+  print('repeats = ' + str(repetitions_count))
   vid_capture.release()
   cv2.destroyAllWindows()
 
