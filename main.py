@@ -10,6 +10,7 @@ from pose_classifier import PoseClassifier
 from EMA_smoothing import EMADictSmoothing
 from embedder import FullBodyPoseEmbedder
 from rep_count import RepetitionCounter
+from PoseClassification import PoseClassificationVisualizer
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -54,9 +55,16 @@ def main():
     frame_width = int(vid_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
      #высоты видео
     frame_height = int(vid_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    video_n_frames = vid_capture.get(cv2.CAP_PROP_FRAME_COUNT)
     video_fps = vid_capture.get(cv2.CAP_PROP_FPS)
     print('FPS: ', video_fps)
 
+   # Initialize renderer.
+  pose_classification_visualizer = PoseClassificationVisualizer(
+        class_name=class_name,
+        plot_x_max=video_n_frames,
+        # Graphic looks nicer if it's the same as `top_n_by_mean_distance`.
+        plot_y_max=10)
   print('\nPress ESC to quit\n')
 
   file_count = 0
@@ -65,9 +73,18 @@ def main():
     if ret == True:
 
       # Run pose tracker
+      start_time=time.time()
+      output_frame = input_frame.copy()
+      font = cv2.FONT_HERSHEY_SIMPLEX
       input_frame = cv2.cvtColor(input_frame, cv2.COLOR_BGR2RGB)
       result = pose_tracker.process(image=input_frame)
       pose_landmarks = result.pose_landmarks
+      end_time=time.time()
+      inf_time=end_time - start_time
+      inf_time = str(inf_time)
+      mess="inf_time:"
+      cv2.putText(output_frame, mess, (470, 140), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+      cv2.putText(output_frame, inf_time, (470, 170), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
 
       # Draw pose prediction
       output_frame = input_frame.copy()
@@ -92,6 +109,15 @@ def main():
         pose_classification_filtered = pose_classification_filter(pose_classification)
 
         repetitions_count = repetition_counter(pose_classification_filtered)
+      
+      #Draw classification plot and repetition counter.
+      output_frame = pose_classification_visualizer(
+        frame=output_frame,
+        pose_classification=pose_classification,
+        pose_classification_filtered=pose_classification_filtered,
+        repetitions_count=repetitions_count)
+
+      output_frame = cv2.resize(output_frame, (500, 300))
 
       output_frame = cv2.resize(output_frame, (500, 300))
       font = cv2.FONT_HERSHEY_SIMPLEX #шрифт
@@ -100,7 +126,9 @@ def main():
       prev_frame_time = new_frame_time
       fps = int(fps)
       fps = str(fps)
-      cv2.putText(output_frame, fps, (7, 70), font, 3, (100, 255, 0), 3, cv2.LINE_AA)
+      mess_fps="FPS:"
+      cv2.putText(output_frame, mess_fps, (370, 140), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
+      cv2.putText(output_frame, fps, (440,140), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
       output_frame = cv2.cvtColor(output_frame, cv2.COLOR_RGB2BGR)
       cv2.imshow('Frames', output_frame)
       file_count += 1
