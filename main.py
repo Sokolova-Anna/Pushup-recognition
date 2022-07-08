@@ -1,6 +1,7 @@
 import argparse
 import cv2
 import mediapipe as mp
+from datetime import datetime
 import time
 import numpy as np
 import io
@@ -59,12 +60,13 @@ def main():
     video_fps = vid_capture.get(cv2.CAP_PROP_FPS)
     print('FPS: ', video_fps)
 
-   # Initialize renderer.
+  # Initialize renderer.
   pose_classification_visualizer = PoseClassificationVisualizer(
         class_name=class_name,
         plot_x_max=video_n_frames,
         # Graphic looks nicer if it's the same as `top_n_by_mean_distance`.
         plot_y_max=10)
+
   print('\nPress ESC to quit\n')
 
   file_count = 0
@@ -74,26 +76,27 @@ def main():
 
       # Run pose tracker
       start_time=time.time()
+      input_frame = cv2.cvtColor(input_frame, cv2.COLOR_RGB2BGR)
       output_frame = input_frame.copy()
       font = cv2.FONT_HERSHEY_SIMPLEX
-      input_frame = cv2.cvtColor(input_frame, cv2.COLOR_BGR2RGB)
       result = pose_tracker.process(image=input_frame)
       pose_landmarks = result.pose_landmarks
       end_time=time.time()
-      inf_time=end_time - start_time
+      inf_time=(end_time - start_time)*1000
+      inf_time = float('{:.0f}'.format(inf_time))
       inf_time = str(inf_time)
       mess="inf_time:"
-      cv2.putText(output_frame, mess, (470, 140), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
-      cv2.putText(output_frame, inf_time, (470, 170), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+       
+
 
       # Draw pose prediction
-      output_frame = input_frame.copy()
+      #output_frame = input_frame.copy()
       if pose_landmarks is not None:
         mp_drawing.draw_landmarks(
           image=output_frame,
           landmark_list=pose_landmarks,
           connections=mp_pose.POSE_CONNECTIONS)
-
+    
       if pose_landmarks is not None:
         # Get landmarks.
         frame_height, frame_width = output_frame.shape[0], output_frame.shape[1]
@@ -109,7 +112,9 @@ def main():
         pose_classification_filtered = pose_classification_filter(pose_classification)
 
         repetitions_count = repetition_counter(pose_classification_filtered)
+
       
+
       #Draw classification plot and repetition counter.
       output_frame = pose_classification_visualizer(
         frame=output_frame,
@@ -117,9 +122,6 @@ def main():
         pose_classification_filtered=pose_classification_filtered,
         repetitions_count=repetitions_count)
 
-      output_frame = cv2.resize(output_frame, (500, 300))
-
-      output_frame = cv2.resize(output_frame, (500, 300))
       font = cv2.FONT_HERSHEY_SIMPLEX #шрифт
       new_frame_time = time.time()
       fps = 1/(new_frame_time-prev_frame_time)
@@ -127,9 +129,19 @@ def main():
       fps = int(fps)
       fps = str(fps)
       mess_fps="FPS:"
-      cv2.putText(output_frame, mess_fps, (370, 140), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
-      cv2.putText(output_frame, fps, (440,140), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
-      output_frame = cv2.cvtColor(output_frame, cv2.COLOR_RGB2BGR)
+
+      overlay = output_frame.copy()
+      cv2.rectangle(overlay, (5, 440), (227, 350), (0, 0, 0), -1)
+      cv2.addWeighted(overlay, 0.40, output_frame, 0.60, 0, output_frame)
+
+      cv2.putText(output_frame, mess_fps, (10, 385), font, 0.9, (10, 10, 200), 2) 
+      cv2.putText(output_frame, fps, (80, 385), font, 0.9, (10, 10, 200), 2) 
+
+      cv2.putText(output_frame, mess, (10, 416), font, 1, (10, 10, 200), 2) 
+      cv2.putText(output_frame, inf_time, (150, 416), font, 0.9, (10, 10, 200), 2)
+      
+      
+      #output_frame = cv2.cvtColor(output_frame, cv2.COLOR_BGR2RGB)
       cv2.imshow('Frames', output_frame)
       file_count += 1
       key = cv2.waitKey(1)
@@ -139,6 +151,7 @@ def main():
       break
 
   print('repeats = ' + str(repetitions_count))
+
   vid_capture.release()
   cv2.destroyAllWindows()
 
